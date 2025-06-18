@@ -76,6 +76,7 @@ def send_enquiry(req: EnquiryRequest):
         print(f"Vendor: {vendor.get('name')}")
         print(f"Address: {vendor.get('address')}")
         print(f"Phone: {vendor.get('phone')}")
+        print(f"Location: {vendor.get('lat')}, {vendor.get('lon')}")
     return {
         "message": "Enquiry successfully received",
         "vendor_count": len(req.vendors)
