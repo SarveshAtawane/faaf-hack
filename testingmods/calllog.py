@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 # Configuration - Replace with your actual values
-API_KEY = "61030d2b-50af-4b4e-a7b6-52d9530a6dba"
+API_KEY = "8c4cd1a3-67ab-4449-bdeb-90e8dd4238c4"
 BASE_URL = "https://api.vapi.ai"
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     print("=" * 60)
     
     # Replace with an actual call ID from your previous calls
-    CALL_ID = "11e4382a-55e2-431e-8259-e9547224524e"
+    CALL_ID = "574f5d38-72c0-43bc-915e-e532ee954fa7"
     
     print("Choose an option:")
     print("1. Get call details")

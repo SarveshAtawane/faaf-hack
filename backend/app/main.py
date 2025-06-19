@@ -3,6 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict
 from serpapi import GoogleSearch
+from pymongo import MongoClient
+import hashlib
+# MongoDB connection
+client = MongoClient("mongodb://localhost:27017")  # adjust if using Atlas or remote
+db = client["vendor_db"]
+collection = db["vendors"]
+from datetime import datetime
 
 app = FastAPI()
 
@@ -25,6 +32,7 @@ class SearchRequest(BaseModel):
 class EnquiryRequest(BaseModel):
     product: str
     vendors: List[Dict]
+    location: str
 
 # -----------------------------
 # Search API
@@ -71,14 +79,57 @@ def search_vendors(req: SearchRequest):
 @app.post("/enquire")
 def send_enquiry(req: EnquiryRequest):
     print(f"Enquiry for product: {req.product}")
-    for vendor in req.vendors:
-        print("-" * 40)
-        print(f"Vendor: {vendor.get('name')}")
-        print(f"Address: {vendor.get('address')}")
-        print(f"Phone: {vendor.get('phone')}")
-        print(f"Location: {vendor.get('lat')}, {vendor.get('lon')}")
-    return {
-        "message": "Enquiry successfully received",
-        "vendor_count": len(req.vendors)
-    }
+    inserted_ids = []
 
+    for vendor in req.vendors:
+        # Create a unique hash index (store name + lat + lon)
+        unique_key = hashlib.md5(f"{vendor.name}_{vendor.lat}_{vendor.lon}".encode()).hexdigest()
+
+        # Create document
+        vendor_doc = {
+            "_id": unique_key,
+            "product": req.product,
+            "location_bucket": f"{vendor.lat},{vendor.lon}",
+            "name": vendor.name,
+            "address": vendor.address,
+            "phone": vendor.phone,
+            "availability": None,
+            "price": None,
+            "variants": [],
+            "alternatives": [],
+            "min_availability_time": None,
+            "call_summary": None,
+            "timestamp": datetime.utcnow(), # current UTC time
+            "call_status": "pending",  # initial status
+        }
+
+
+        # Insert or update (upsert)
+        result = collection.update_one(
+            {"_id": unique_key},
+            {"$set": vendor_doc},
+            upsert=True
+        )
+
+        inserted_ids.append(unique_key)
+
+    return {
+        "message": "Enquiry stored in MongoDB",
+        "inserted": inserted_ids,
+        "vendor_count": len(inserted_ids)
+    }
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+
+@app.get("/enquiries")
+def get_all_enquiries():
+    # Fetch all documents from MongoDB
+    documents = list(collection.find({}))
+
+    # Convert ObjectId and datetime to JSON-friendly format
+    for doc in documents:
+        doc["_id"] = str(doc["_id"])  # keep hash string
+        if "timestamp" in doc:
+            doc["timestamp"] = doc["timestamp"].isoformat()
+
+    return JSONResponse(content={"enquiries": documents})

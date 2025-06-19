@@ -2,10 +2,10 @@ import requests
 import json
 
 # Configuration - Replace with your actual values
-API_KEY = "61030d2b-50af-4b4e-a7b6-52d9530a6dba"
-ASSISTANT_ID = "8c08b468-e8d6-49f4-b04a-55e3f7bc98b3"
-PHONE_NUMBER_ID = "db8341b3-e89e-441f-8f16-4fd514700d65"
-CUSTOMER_PHONE = "+917588708498"  # Customer's phone number
+API_KEY = "8c4cd1a3-67ab-4449-bdeb-90e8dd4238c4"
+ASSISTANT_ID = "98d8ba6f-d6e0-4e72-8100-d095a976c474"
+PHONE_NUMBER_ID = "d4dfe093-298f-4033-90b6-27602eff8ef4"
+CUSTOMER_PHONE = "+919527699807"  # Customer's phone number
 
 # API endpoint and headers
 BASE_URL = "https://api.vapi.ai"
@@ -64,15 +64,22 @@ def create_outbound_call_with_overrides():
         },
         "name": "Personalized Outbound Call",
         "assistantOverrides": {
-            # Dynamic variables that can be used in your assistant's prompts
-            "variableValues": {
-                "product_name": "BLue Tulip Flowers",
-                "store_name": "Floral farm",
-                "location": "HSR",
-                "date": "2023-10-01",
-                "time": "10:00 AM",
-
+        "variableValues": {
+            "product_name": "Minoxidil",
+            "store_name": "Piramal Pharmacy", 
+            "location": "HSR",
+            "date": "2023-10-01",
+            "time": "10:15 AM",
+            "is_retry": False,
+            "previous_call_data": {
+            "availability": True,
+            "price": "500",
+            "variants": "",
+            "alternatives": "",
+            "porter_delivery": "",
+            "min_time_available": ""
             }
+        }
         }
     }
 
