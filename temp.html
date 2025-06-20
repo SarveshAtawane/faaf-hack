@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .loading { background-color: #fff3cd; color: #856404; }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .data {
+            background: #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .enquiry-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            background: white;
+        }
+        
+        .vendor-list {
+            margin-left: 20px;
+        }
+        
+        .vendor-item {
+            background: #f8f9fa;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket Connection Test</h1>
+        
+        <div id="status" class="status disconnected">
+            🔴 Disconnected
+        </div>
+        
+        <div>
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+            <button onclick="testBroadcast()">Test Broadcast</button>
+            <button onclick="clearLog()">Clear Log</button>
+            <button onclick="checkDebugEndpoints()">Check Debug Endpoints</button>
+        </div>
+        
+        <h3>📊 Live Data</h3>
+        <div>
+            <strong>Enquiries Count:</strong> <span id="enquiry-count">0</span> |
+            <strong>Total Vendors:</strong> <span id="vendor-count">0</span> |
+            <strong>Last Update:</strong> <span id="last-update">Never</span>
+        </div>
+        
+        <h3>📋 Enquiries</h3>
+        <div id="enquiries-display"></div>
+        
+        <h3>📝 Connection Log</h3>
+        <div id="log" class="log"></div>
+        
+        <h3>🔍 Raw Data</h3>
+        <div id="raw-data" class="data">No data received yet...</div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('log');
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function updateStatus(connected) {
+            const statusElement = document.getElementById('status');
+            if (connected) {
+                statusElement.className = 'status connected';
+                statusElement.textContent = '🟢 Connected';
+            } else {
+                statusElement.className = 'status disconnected';
+                statusElement.textContent = '🔴 Disconnected';
+            }
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('❌ Already connected');
+                return;
+            }
+            
+            log('🔄 Attempting to connect...');
+            
+            try {
+                ws = new WebSocket('ws://localhost:8000/ws/enquiries');
+                
+                ws.onopen = function() {
+                    log('✅ WebSocket connected successfully');
+                    updateStatus(true);
+                    reconnectAttempts = 0;
+                };
+                
+                ws.onmessage = function(event) {
+                    log(`📨 Message received: ${event.data.length} characters`);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        if (data.type === 'ping') {
+                            log('🏓 Received ping from server');
+                            return;
+                        }
+                        
+                        if (data.enquiries) {
+                            log(`📦 Received ${data.enquiries.length} enquiries`);
+                            processEnquiriesData(data);
+                        }
+                        
+                        // Update raw data display
+                        document.getElementById('raw-data').textContent = JSON.stringify(data, null, 2);
+                        
+                    } catch (e) {
+                        log(`❌ Error parsing message: ${e.message}`);
+                        document.getElementById('raw-data').textContent = event.data;
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    log(`❌ WebSocket closed: Code ${event.code}, Reason: ${event.reason}`);
+                    updateStatus(false);
+                    
+                    // Auto-reconnect logic
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        log(`🔄 Reconnecting in 3 seconds... (Attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+                        setTimeout(connect, 3000);
+                    } else {
+                        log('❌ Max reconnection attempts reached');
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`);
+                    updateStatus(false);
+                };
+                
+            } catch (error) {
+                log(`❌ Connection error: ${error.message}`);
+                updateStatus(false);
+            }
+        }
+        
+        function disconnect() {
+            if (ws) {
+                reconnectAttempts = maxReconnectAttempts; // Prevent auto-reconnect
+                ws.close(1000, 'Manual disconnect');
+                log('🔌 Manually disconnected');
+            }
+        }
+        
+        function processEnquiriesData(data) {
+            const enquiries = data.enquiries || [];
+            
+            // Group by collection (enquiry)
+            const enquiriesMap = {};
+            enquiries.forEach(vendor => {
+                const collectionName = vendor.__collection__;
+                if (!enquiriesMap[collectionName]) {
+                    const parts = collectionName.split('_');
+                    const location = parts.pop();
+                    const product = parts.join('_');
+                    enquiriesMap[collectionName] = {
+                        id: collectionName,
+                        product,
+                        location,
+                        vendors: []
+                    };
+                }
+                enquiriesMap[collectionName].vendors.push(vendor);
+            });
+            
+            const enquiriesArray = Object.values(enquiriesMap);
+            const totalVendors = enquiries.length;
+            
+            // Update counters
+            document.getElementById('enquiry-count').textContent = enquiriesArray.length;
+            document.getElementById('vendor-count').textContent = totalVendors;
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+            
+            // Update display
+            const displayElement = document.getElementById('enquiries-display');
+            displayElement.innerHTML = '';
+            
+            enquiriesArray.forEach(enquiry => {
+                const enquiryDiv = document.createElement('div');
+                enquiryDiv.className = 'enquiry-card';
+                enquiryDiv.innerHTML = `
+                    <strong>${enquiry.product}</strong> in <em>${enquiry.location}</em>
+                    <div class="vendor-list">
+                        ${enquiry.vendors.map(vendor => `
+                            <div class="vendor-item">
+                                <strong>${vendor.name || 'Unknown'}</strong> - 
+                                Status: ${vendor.call_status || 'Pending'} - 
+                                Phone: ${vendor.phone || 'N/A'}
+                                ${vendor.call_summary ? `<br><small>Summary: ${vendor.call_summary}</small>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                displayElement.appendChild(enquiryDiv);
+            });
+            
+            log(`✅ Processed ${enquiriesArray.length} enquiries with ${totalVendors} total vendors`);
+        }
+        
+        async function testBroadcast() {
+            try {
+                log('🧪 Triggering test broadcast...');
+                const response = await fetch('http://localhost:8000/test-broadcast');
+                const result = await response.json();
+                log(`📡 Test broadcast result: ${JSON.stringify(result)}`);
+            } catch (error) {
+                log(`❌ Test broadcast error: ${error.message}`);
+            }
+        }
+        
+        async function checkDebugEndpoints() {
+            try {
+                // Check connections
+                log('🔍 Checking debug endpoints...');
+                const connectionsResponse = await fetch('http://localhost:8000/debug-connections');
+                const connectionsData = await connectionsResponse.json();
+                log(`🔌 Connections: ${JSON.stringify(connectionsData)}`);
+                
+                // Check database
+                const dbResponse = await fetch('http://localhost:8000/debug-database');
+                const dbData = await dbResponse.json();
+                log(`💾 Database: ${JSON.stringify(dbData, null, 2)}`);
+                
+            } catch (error) {
+                log(`❌ Debug endpoints error: ${error.message}`);
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            log('🚀 Page loaded, attempting to connect...');
+            connect();
+        };
+    </script>
+</body>
+</html>
