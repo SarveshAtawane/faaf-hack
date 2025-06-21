@@ -1,9 +1,13 @@
 from fastapi import APIRouter
 from models.schemas import SearchRequest
 from serpapi import GoogleSearch
+import os
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 router = APIRouter()
-
+SERP_API_API_KEY = os.getenv("SERP_API_API_KEY")
 @router.post("/search")
 def search_vendors(req: SearchRequest):
     if "," in req.location:
@@ -16,7 +20,7 @@ def search_vendors(req: SearchRequest):
         "engine": "google_maps",
         "q": req.query,
         "ll": ll,
-        "api_key": "ae8bad07321c4f18db972fe4d3fad8806c65bac32ffb2acd63dd6a27c8fe9f92"  # put this in .env or config
+        "api_key": SERP_API_API_KEY # put this in .env or config
     }
 
     search = GoogleSearch(params)

@@ -106,7 +106,7 @@ router = APIRouter()
 #         print(f"❌ Error in broadcast_enquiries_update: {e}")
 #         logging.exception("Full error details:")
 
-@router.post("//vapi/webhook")  # Fixed the double slash
+@router.post("/vapi/webhook")  # Fixed the double slash
 async def vapi_webhook_listener(request: Request):
     try:
         body = await request.json()

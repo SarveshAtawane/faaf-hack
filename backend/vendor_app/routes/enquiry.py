@@ -49,6 +49,7 @@ active_connections: list[WebSocket] = []
 #     for conn in disconnected:
 #         active_connections.remove(conn)
 
+
 @router.post("/enquire")
 async def send_enquiry(req: EnquiryRequest):
     normalized_location = req.location.replace(" ", "")
@@ -64,6 +65,7 @@ async def send_enquiry(req: EnquiryRequest):
         vendor_doc = {
             "_id": unique_key,
             "product": req.product,
+            "additional_details": req.additional_details or "",  # Store additional details
             "location_bucket": f"{vendor['lat']},{vendor['lon']}",
             "name": vendor['name'],
             "address": vendor['address'],
@@ -94,10 +96,14 @@ async def send_enquiry(req: EnquiryRequest):
             {"$setOnInsert": vendor_doc},
             upsert=True
         )
-
+        print(f"Vendor {vendor['name']} inserted/updated in `{collection_name}` with key {unique_key} successfully.")
+        print(f"Vendor document: {vendor_doc}")
         inserted.append(unique_key)
-
-        call_result = call_vendor(vendor, req.product, req.location)
+        print(vendor)
+        print(f"Calling vendor: {vendor['name']} at {vendor['phone']}")
+        print(vendor_doc["additional_details"])
+        # Pass additional details to the call_vendor function
+        call_result = call_vendor(vendor, req.product, req.location, vendor_doc["additional_details"])
         calls.append(call_result)
 
         call_id = call_result.get("call_id")
@@ -115,6 +121,7 @@ async def send_enquiry(req: EnquiryRequest):
         "inserted": inserted,
         "calls": calls
     }
+
 
 @router.get("/enquiries")
 def get_all_enquiries():
@@ -143,9 +150,16 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-def call_vendor(vendor: dict, product_name: str, location: str) -> dict:
+def call_vendor(vendor: dict, product_name: str, location: str, details:str) -> dict:
+    print(f"Calling vendor: {vendor['name']} at {vendor['phone']}")
+    print(f"Product: {product_name}, Location: {location}, Details: {details}")
     customer_phone = "+919527699807"
+    if vendor.get('name') == "Rahul Fruits":
+        customer_phone = "+917588708498"  # Use a different phone number for this vendor
+    else:
+        customer_phone = "+919527699807"
     vendor_name = vendor.get("name", "").strip()
+    # print(vendor.get("additional_details"))
     payload = {
         "type": "outboundPhoneCall",
         "assistantId": ASSISTANT_ID,
@@ -159,6 +173,7 @@ def call_vendor(vendor: dict, product_name: str, location: str) -> dict:
                 "product_name": product_name,
                 "store_name": vendor_name,
                 "location": location,
+                "details": details,
                 "is_retry": False
             }
         }

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Optional
 
 class SearchRequest(BaseModel):
     query: str
@@ -7,5 +7,6 @@ class SearchRequest(BaseModel):
 
 class EnquiryRequest(BaseModel):
     product: str
-    vendors: List[Dict]
+    vendors: List[dict]
     location: str
+    additional_details: Optional[str] = ""
